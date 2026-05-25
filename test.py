@@ -1,104 +1,61 @@
+# 第 1 行：導入 Streamlit 套件，用來製作網頁前端介面
 import streamlit as st
+
+# 第 2 行：導入 Pandas 套件，它是 Python 處理表格資料（DataFrame）的黃金工具
 import pandas as pd
+
+# 第 3 行：從安裝好的雲端連線庫中，導入「GSheetsConnection」這個連線核心元件
+# ⚠️ 這裡踩過地雷：雖然下載叫 st-gsheets-connection，但寫代碼導入時必須叫 streamlit_gsheets
 from streamlit_gsheets import GSheetsConnection
 
-# 網頁大標題與授權標註
-st.set_page_config(layout="wide") # 寬螢幕佈局，最適合看板
-st.title("📋 GitHub 雲端同步 Trello 看板")
-st.caption("授權標註：edit by 闕河正")
+# 第 4 行：在網頁上印出大標題
+st.title("🌐 闕老師的雲端資料庫連線測試")
 
 # ==========================================
-# 🛠️ 建立雲端資料庫安全連接器
+# 🛠️ 核心連線設定：呼叫 Streamlit 內建的連線工廠
 # ==========================================
+# 第 5 行：建立一個名為 conn 的連接器。
+# 它會自動跑去讀取 Streamlit Cloud 後台 Secrets 裡的 [connections.gsheets] 設定
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-def fetch_all_cloud_tasks():
-    """從 Google 試算表讀取 Tasks 工作表"""
-    try:
-        # ttl="0" 代表不快取，每次重新整理都強迫去雲端抓最新資料
-        df = conn.read(worksheet="Tasks", ttl="0")
-        # 預防萬一：如果讀出來是空的，自動建立標準欄位骨架
-        if df.empty:
-            df = pd.DataFrame(columns=["title", "status", "owner"])
-        return df
-    except Exception as e:
-        st.error(f"雲端資料庫讀取失敗，請檢查 Secrets 配置。錯誤訊息: {e}")
-        return pd.DataFrame(columns=["title", "status", "owner"])
+# ==========================================
+# 📥 第一動：從雲端把試算表「讀取」出來
+# ==========================================
+st.write("### 1. 目前雲端資料庫的內容：")
 
-def add_cloud_task(title, status, owner):
-    """指派任務時，運用最新的 pd.concat 安全寫回雲端試算表"""
-    df = fetch_all_cloud_tasks()
+# 第 6 行：透過連線器執行 .read() 指令，指定去讀取名為 "Tasks" 的分頁
+# ⚠️ 這裡踩過地雷：ttl="0" 代表快取時間為 0 秒，強迫它每次重新整理都必須「即時」去雲端抓最新資料，不能用舊記憶
+df = conn.read(worksheet="Tasks", ttl="0")
+
+# 第 7 行：在網頁上直接把讀出來的 Pandas 表格（DataFrame）用網頁表格組件渲染出來
+st.dataframe(df)
+
+
+# ==========================================
+# 📤 第二動：從網頁「寫入」新資料回雲端
+# ==========================================
+st.write("---")
+st.write("### 2. 測試寫入一筆新任務：")
+
+# 第 8 行：建立一個網頁按鈕，當使用者點擊這個按鈕時，下方的變數 if 條件會成立
+if st.button("點我！自動新增一筆資料到雲端"):
     
-    # 打包新資料
-    new_row = pd.DataFrame([{"title": title, "status": status, "owner": owner}])
+    # 第 9 行：運用前幾堂課學到的「字典結構」，包裝我們要塞進去的新資料
+    # 裡面的 Key (title, status, owner) 必須和我們在 Excel 第一列手動打的字分毫不差
+    new_data = {"title": "網頁新增的任務", "status": "To Do", "owner": "Python機器人"}
     
-    # 修正盲點：改用新版 Pandas 的 pd.concat 取代舊的 .append()
+    # 第 10 行：把這個字典轉換成 Pandas 認得的單行表格物件（DataFrame）
+    new_row = pd.DataFrame([new_data])
+    
+    # 第 11 行：將原本舊的表格（df）與新的單行表格（new_row）黏在一起
+    # ⚠️ 這裡踩過地雷：新版 Python 廢棄了 .append()，在雲端環境必須改用 pd.concat() 進行表格拼接
     updated_df = pd.concat([df, new_row], ignore_index=True)
     
-    # 逆向寫回雲端 Google Sheets
+    # 第 12 行：透過連線器執行 .update() 指令，把拼接完的全新大表格，整砣蓋回雲端的 "Tasks" 分頁
     conn.update(worksheet="Tasks", data=updated_df)
-    st.success(f"🎉 任務「{title}」已跨越限制，成功同步至雲端！")
-    st.rerun() # 強制網頁立刻刷新，看到最新看板狀態
-
-# ==========================================
-# 📥 撈取最新資料並進行前端排版
-# ==========================================
-df_tasks = fetch_all_cloud_tasks()
-
-# ─── 區塊一：新增任務輸入表單 ───
-st.write("### ➕ 指派新任務")
-with st.form("task_form", clear_on_submit=True):
-    col_t, col_s, col_o = st.columns([2, 1, 1])
-    with col_t:
-        new_title = st.text_input("任務名稱", placeholder="例如：準備段考題目...")
-    with col_s:
-        new_status = st.selectbox("初始狀態", ["To Do", "In Progress", "Done"])
-    with col_o:
-        new_owner = st.text_input("負責人", placeholder="例如：張同學")
     
-    submit_button = st.form_submit_button("確認指派並同步雲端")
+    # 第 13 行：在網頁上噴出綠色的成功提示小框框
+    st.success("🎉 恭喜！資料已成功跨越網路，寫入 Google 試算表！")
     
-    if submit_button and new_title and new_owner:
-        add_cloud_task(new_title, new_status, new_owner)
-
-st.write("---")
-
-# ─── 區塊二：Trello 經典三縱欄畫布 ───
-st.write("### 🗂️ 看板動態狀態監控")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("### 🔴 To Do")
-    # 過濾出狀態為 To Do 的任務
-    todo_list = df_tasks[df_tasks["status"] == "To Do"]
-    if not todo_list.empty:
-        for idx, row in todo_list.iterrows():
-            with st.container(border=True):
-                st.write(f"**📌 {row['title']}**")
-                st.caption(f"👤 負責人: {row['owner']}")
-    else:
-        st.info("暫無任務")
-
-with col2:
-    st.markdown("### 🟡 In Progress")
-    # 過濾出狀態為 In Progress 的任務
-    ip_list = df_tasks[df_tasks["status"] == "In Progress"]
-    if not ip_list.empty:
-        for idx, row in ip_list.iterrows():
-            with st.container(border=True):
-                st.write(f"**⚡ {row['title']}**")
-                st.caption(f"👤 負責人: {row['owner']}")
-    else:
-        st.info("暫無任務")
-
-with col3:
-    st.markdown("### 🟢 Done")
-    # 過濾出狀態為 Done 的任務
-    done_list = df_tasks[df_tasks["status"] == "Done"]
-    if not done_list.empty:
-        for idx, row in done_list.iterrows():
-            with st.container(border=True):
-                st.write(f"**✅ ~~{row['title']}~~**")
-                st.caption(f"👤 負責人: {row['owner']}")
-    else:
-        st.info("暫無任務")
+    # 第 14 行：強制網頁自我重新整理（Rerun），這會讓程式重新回到第 6 行，抓到剛剛寫進去的最新表格
+    st.rerun()
