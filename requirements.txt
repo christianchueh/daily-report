@@ -1,3 +1,2 @@
 streamlit
-st-theme
 streamlit-gsheets
