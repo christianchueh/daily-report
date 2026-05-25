@@ -1,6 +1,6 @@
 import streamlit as st
 # 導入 Streamlit 內建的雲端連線庫
-from streamlit_gsheets import GSheetsConnection
+from st_gsheets_connection import GSheetsConnection
 
 st.title("📋 GitHub 雲端同步 Trello 看板")
 st.caption("授權標註：edit by 闕河正")
