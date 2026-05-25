@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from gsheets_connection import GSheetsConnection
+from streamlit_gsheets import GSheetsConnection
 
 # 網頁大標題與授權標註
 st.set_page_config(layout="wide") # 寬螢幕佈局，最適合看板
